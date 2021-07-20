@@ -9,7 +9,6 @@ output:
 runtime: shiny
 ---
 
-_Trang_: How does the below chunk help troubleshoot reactive data?
 ```{r input_demo, eval = FALSE}
 # this chunk doesn't run but works to troubleshoot reactive data 
 input <- list(
@@ -22,6 +21,7 @@ input <- list(
 library(tidyverse)
 library(shiny)        #renderPlot, renderTable, sliderInput
 library(shinyWidgets) #radioGroupButtons
+library(plotly)
 raw_data <- mpg 
 
 
@@ -184,11 +184,12 @@ Column {.tabset}
 
 May the force be with you
 =====================================
-Column {.sidebar data-width=200} 
+Column {data-width=200} 
 -------------------------------------
-Filter the data:
+
 
 ```{r read-in}
+# Filter the data
 starwars <- dplyr::starwars
 min_height <- min(starwars$height, na.rm = TRUE)
 max_height <- max(starwars$height, na.rm = TRUE)
@@ -208,9 +209,13 @@ radioGroupButtons( # for categorical variables
   choices = c("All", sort(unique(starwars$sex))), # can use paste, etc to make nicer display
   justified = TRUE, # will fill the width of the container it sits in (sidebar)
   status = "primary", # the color of the buttons
-  direction = "vertical"
+  direction = "vertical",
+  width = "95%"
 )
+```
 
+
+```{r slide-height}
 sliderInput(
   inputId = "height", 
   label = "Set character height range:",
@@ -219,7 +224,10 @@ sliderInput(
   max = max_height,
   step = 0.1
 )
+```
 
+
+```{r reacive-data}
 use_starwars <- reactive({
   starwars %>%
     filter(between(height, min(input$height), max(input$height))) %>% 
@@ -242,14 +250,18 @@ flexdashboard::gauge(
 
 Column {data-width=450}
 -----------------------------------------------------------------------
-### Character height vs. mass
+### Character height vs. mass, Jabba and everyone else
+
 ```{r mass-hight-plot}
-renderPlot({ 
-  ggplot(use_starwars(), aes(mass, height)) +
-    geom_smooth(color = "grey65") +
-    geom_point(aes(color = factor(gender))) +
+renderPlotly({ 
+  ggstar <- ggplot(use_starwars(), aes(mass, height)) +
+    # geom_smooth(color = "grey65") +
+    geom_point(aes(color = factor(gender), text = name)) +
     labs(color = NULL) +
+    rcartocolor::scale_color_carto_d() +
     theme(legend.position = "bottom")
+  
+  ggplotly(ggstar, tooltip="text")
 })
 ```
 
@@ -258,7 +270,11 @@ renderPlot({
 ```{r}
 renderTable({ 
   use_starwars() %>% 
-    sample_n(10)
+    select(name, birth_year, homeworld, species) %>% 
+    {
+      if (nrow(.) < 10) . else sample_n(., 10)  
+    }
+    
 },
   spacing = "xs",
   align = "l",
